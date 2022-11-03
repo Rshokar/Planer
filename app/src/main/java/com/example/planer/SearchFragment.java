@@ -2,6 +2,7 @@ package com.example.planer;
 
 import android.content.Intent;
 import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 import com.example.planer.currecnyconverter.CurrencyConverter;
 import com.example.planer.favourite.FavouriteCountriesAdapter;
 import com.example.planer.favourite.FavouriteCountry;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -46,6 +48,7 @@ public class SearchFragment extends Fragment {
     private TextView visaInfoText;
     private TextView advisory;
     private ImageView riskLevelIcon;
+    private TextView rate;
 
     private String visaContent;
     private String advisoryContent;
@@ -56,8 +59,8 @@ public class SearchFragment extends Fragment {
     private ImageView conditionsIcon;
     private TextView temperature;
 
-    // Currecny Converter
-    private CurrencyConverter cC =  new CurrencyConverter();
+    // Currency Converter
+    private CurrencyConverter cC = new CurrencyConverter();
 
     public SearchFragment() {
         super(R.layout.fragment_search);
@@ -72,9 +75,9 @@ public class SearchFragment extends Fragment {
             homeCountry = getArguments().getString("home");
             countrySelected = getArguments().getString("country");
             System.out.println(countrySelected);
-            updateVisaCard();
-            updateDataFromCountries();
-            updateWeather();
+
+            MyAsyncTask task = new MyAsyncTask();
+            task.execute();
         }
     }
 
@@ -101,22 +104,7 @@ public class SearchFragment extends Fragment {
         visaInfoText = view.findViewById(R.id.visaInfo);
         advisory = view.findViewById(R.id.restrictionCovidDetail);
         riskLevelIcon = view.findViewById(R.id.imageView);
-
-
-        if (homeCountry != null || countrySelected != null) {
-            cC.setHome(homeCountry);
-            cC.setDestination(countrySelected);
-
-            TextView rate = view.findViewById(R.id.currencyBlank);
-
-            Log.d("Android", "HOME AND DEST: " + cC.getHome() + " " + cC.getDestination());
-
-            cC.updateRate(getContext(), () -> {
-                rate.setText(cC.toString());
-            });
-        }
-
-
+        rate = view.findViewById(R.id.currencyBlank);
         weatherCity = view.findViewById(R.id.currentWeather);
         conditions = view.findViewById(R.id.conditions);
         conditionsIcon = view.findViewById(R.id.conditionsIcon);
@@ -164,12 +152,13 @@ public class SearchFragment extends Fragment {
                     }
                 });
     }
+
     private void updateWeather() {
         // get countrySelected, query db for capital, send capital into api call, pick apart json and update views
         db.collection("countries")
                 .document(countrySelected)
                 .get()
-                .addOnCompleteListener(task-> {
+                .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         DocumentSnapshot doc = task.getResult();
                         Map<String, Object> group = doc.getData();
@@ -214,8 +203,19 @@ public class SearchFragment extends Fragment {
                                 RequestQueue requestQueue = Volley.newRequestQueue(getContext());
                                 requestQueue.add(stringRequest);
                             }
+                        });
+                    }
                 });
-            }
+    }
+
+    private void updateCurrency() {
+        while (homeCountry == null || countrySelected == null) {
+            // do nothing
+        }
+        cC.setHome(homeCountry);
+        cC.setDestination(countrySelected);
+        cC.updateRate(getContext(), () -> {
+            rate.setText(cC.toString());
         });
     }
 
@@ -295,6 +295,17 @@ public class SearchFragment extends Fragment {
                 return;
             case NOT_RECOMMENDED:
                 scoreCard.setCardBackgroundColor(Color.GRAY);
+        }
+    }
+
+    class MyAsyncTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... voids) {
+            updateVisaCard();
+            updateDataFromCountries();
+            updateWeather();
+            updateCurrency();
+            return null;
         }
     }
 }
